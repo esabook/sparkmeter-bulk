@@ -1,0 +1,26 @@
+{
+    "credentials": [
+        {
+            "baseurl": "https://sparkcloud-evi.herokuapp.com",
+            "disabled": true,
+            "password": "",
+            "username": "matt.com"
+        },
+        {
+            "baseurl": "https://-..cloud",
+            "disabled": true,
+            "password": "",
+            "username": "@-.com"
+        },
+        {
+            "baseurl": "https://-.sparkmeter.cloud",
+            "password": "",
+            "username": "matt@.com"
+        },
+        {
+            "baseurl": "https://..cloud",
+            "password": "",
+            "username": "matt@-"
+        }
+    ]
+}
