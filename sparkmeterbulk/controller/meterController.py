@@ -4,7 +4,7 @@ from enum import Enum
 
 import json
 import http.client, urllib
-
+from bs4 import BeautifulSoup
 
 class meterState(Enum):
     off= 0
@@ -20,6 +20,7 @@ class meterController():
         self.BROWSER = loginSession.BROWSER
         self.METER_JSONCOLLECTION = {'meters':[]}
         self.METER_FILTER = {}
+        self.MAIN_uRL = None
 
     def read(self):
         'Read current `METER_JSONCOLLECTION`'
@@ -31,19 +32,63 @@ class meterController():
         br = self.BROWSER
         if  br._cursor == -1 : return self
 
-        main_url = br.url
-        grab_meter_url = main_url + 'meters.json'
+        self.MAIN_uRL = br.url if self.MAIN_uRL is None else self.MAIN_uRL
+        grab_meter_url = self.MAIN_uRL + 'meters.json'
 
         # 2 
         br.open(grab_meter_url)
         content = json.loads(br.response.text)
 
         # 3
-        content['main_url'] = main_url
+        content['main_url'] = self.MAIN_uRL
 
         self.METER_JSONCOLLECTION = content
         return self
 
+    def getDetailOfAllMeterlInfo(self, **kwargs):
+        meters = self.METER_JSONCOLLECTION
+        tempDetailInfo = []
+
+        for meter in meters['meters']:
+            param = {**{'address_coords':'address-coords', 'customer_code':'customer-code'},**kwargs}
+            detailInfo = self.getGrabDetailedMeterInfoByScrapping(meter['meter_serial'], **param)
+            meter = {**meter, **detailInfo}
+            tempDetailInfo.append(meter)
+        
+        meters["meters"] = tempDetailInfo
+        self.METER_JSONCOLLECTION = meters
+        return self
+
+    #TODO: need optimizing
+    def getGrabDetailedMeterInfoByScrapping(self, meterserial, **kwargs):
+        returnBrowser = self.BROWSER
+        if  returnBrowser._cursor == -1 : return returnBrowser
+        
+        mainUrl=self.read()['main_url']
+        set_meter_url = mainUrl + meterserial
+        returnBrowser.open(set_meter_url)
+		
+        bs = BeautifulSoup(returnBrowser.response.text, 'lxml')
+        returnDict = {}
+        for arg in kwargs:
+            returnDict[arg] = bs.find('dd', id=kwargs[arg]).text
+
+        return returnDict
+
+    def getMeterDetailInfo(self, meterserial):
+        'Get all available meters on sparkmeter server, return object of myself'
+        # 1 
+        br = self.BROWSER
+        if  br._cursor == -1 : return self
+
+        self.MAIN_uRL = br.url if self.MAIN_uRL is None else self.MAIN_uRL
+        grab_meter_url = self.MAIN_uRL + meterserial +'/jsondata'
+    
+        # 2 
+        br.open(grab_meter_url)
+        content = json.loads(br.response.text)
+        return content['meter']
+        
     def getMeterInfo(self,  filterJson=None, useFilter: bool=False):
         'Return `getAllMeterInfo()` but selected meters is based on filter'
         self.getAllMeterInfo()
@@ -51,18 +96,17 @@ class meterController():
         tempFilteredMeter=[]
 
         #4
-        if not useFilter or filterJson is None:
+        if not useFilter or filterJson is None or len(filterJson)<1:
             self.METER_JSONCOLLECTION = meters
         else:
 
             for meter in meters['meters']:
                 if self.__compareMeterWithFilter(meter, filterJson):
                     tempFilteredMeter.append(meter)
-                else:
-                    pass
-
-        meters['meters']=tempFilteredMeter
-        self.METER_JSONCOLLECTION = meters
+                
+            meters['meters']=tempFilteredMeter
+            self.METER_JSONCOLLECTION = meters
+        
         return self
 
     def changeAllMeterCredit(self, amountTarget:float, currentMaximumAmount:float):
@@ -84,7 +128,7 @@ class meterController():
             if credit < currentMaximumAmount and credit < amountTarget :
 			
 				# 2  set meter credit
-                print('Meter: %-45s from %-30s => add %-20s' % (serial, credit, abs(amountTarget-credit)),end = "")			
+                print('Meter: %-45s from %-30s => add %-20s ' % (serial, credit, abs(amountTarget-credit)),end = "")			
 
                 br = self.changeMeterCredit(serial, abs( amountTarget - credit)) 
                 print('http response: %s' % (br.response.status_code))
@@ -109,7 +153,7 @@ class meterController():
             serial = meter['meter_serial']		
 			
             # 2  set meter state
-            print('Meter: %-45s from %-30s => add %-20s' % (serial, currentState, newMeterState), end = "")			
+            print('Meter: %-45s from %-30s => to %-20s ' % (serial, currentState, newMeterState), end = "")			
 
             br = self.changeMeterState(serial, newMeterState) 
             print('http response: %s' % (br.response.status_code))
@@ -127,9 +171,9 @@ class meterController():
             serial = meter['meter_serial']		
 			
             # 2  set meter credit
-            print('Meter: %-45s from %-30s => add %-20s' % (serial, currentTariff, TarifID), end = "")			
+            print('Meter: %-45s from %-30s => to %-20s ' % (serial, currentTariff, TarifID), end = "")			
 
-            br = self.changeMeterState(serial, TarifID) 
+            br = self.changeMeterTarif(serial, TarifID) 
             print('http response: %s' % (br.response.status_code))
 				
         
@@ -158,28 +202,51 @@ class meterController():
         
         mainUrl=self.read()['main_url']
         url = mainUrl + meter_serial +'/set-state'
-        bodyParams = urllib.parse.urlencode({'state': relayState})
+        #bodyParams = urllib.parse.urlencode({'state': relayState})
 
-        response =br.session.post(url,None,json=bodyParams)
+        response =br.session.post(url,None, json={'state': relayState})
         br._update_state(response)
 
         return br
     
     def changeMeterTarif(self, meter_serial:str, tarif:str):
-        br = self.BROWSER
-        if  br._cursor == -1 : return br
+        returnBrowser = self.BROWSER
+        if  returnBrowser._cursor == -1 : return returnBrowser
         
         mainUrl=self.read()['main_url']
         set_meter_url = mainUrl + meter_serial +'/edit'
-        br.open(set_meter_url)
+        returnBrowser.open(set_meter_url)
 		
-        kwargs = {'class':'form form-horizontal'}
-        form = br.get_form(None,None,kwargs)
-        form['config-tariff'].value = tarif
+        form = returnBrowser.get_form(class_='form form-horizontal')
+        if tarif in form['config-tariff'].options :
+            form['config-tariff'].value = tarif
+            returnBrowser.submit_form(form)
 
-        print(form['config-state'])
-        br.submit_form(form)
-        return br
+        
+        return returnBrowser
+
+    def editMeterInfo(self, meterserial:str, **kwargs):
+        
+        #mapp = ["address-street1", "address-street2", "address-city","address-state", "address-postalcode", "address-country", "address-coords", "customer-name", "customer-code"]
+       
+        returnBrowser = self.BROWSER
+        if  returnBrowser._cursor == -1 : return returnBrowser
+        
+        mainUrl=self.read()['main_url']
+        set_meter_url = mainUrl + meterserial +'/edit'
+        returnBrowser.open(set_meter_url)
+		
+        form = returnBrowser.get_form(class_='form form-horizontal')
+        for key, value in kwargs.items():
+            #TODO: add support optionz
+            if key not in ['tariff_name']:
+                try:
+                    form[str(key).replace('_', '-')].value = value
+                except:
+                    pass
+        returnBrowser.submit_form(form)
+        return returnBrowser
+
 
 
 
@@ -206,8 +273,8 @@ class meterController():
 
                     mval = meterInfo[op[0]]
                     fval = filterJson[met]
-                    condition = self.__compare(mval, op[1], fval) and condition
-                    
+                    condition = self.__compare(mval.lower(), op[1], fval.lower()) and condition
+               
                 except :
                     pass
         except:
@@ -217,6 +284,7 @@ class meterController():
 
     def __compare(self,left, operator, right):
         'comparator method to compare given value of `left` and `right` by string of `operator`. Return true/false'
+
         if	operator == '<'  : return left <    right
         if	operator == '<=' : return left <=   right
         if	operator == '> ' : return left >    right
@@ -227,5 +295,4 @@ class meterController():
         if	operator == '-%' : return right in left
         if	operator == '%!' : return left not in  right	
         if	operator == '!%' : return right not in left
-
         return right == left

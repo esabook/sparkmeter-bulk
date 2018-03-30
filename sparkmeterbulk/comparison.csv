@@ -1,0 +1,3 @@
+address_street1;address_street2;customer_name;meter_credit_value;meter_is_running_plan;meter_serial;tariff_name; site_url; add?
+P 6022 H 2h;8;your_name;-130000.0;TRUE;SM5R-03-0000528B;Sumba - BUMDes;http://url.com;no
+P 6022 H 2h;8;my ame;-130000.0;TRUE;SM5R-03-0000528C;Sumba - BUMDes;http://url.com;

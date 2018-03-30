@@ -4,10 +4,12 @@ from utils.readJson import rJ
 from sub_console.console import console
 from sub_console.menu_customFilter import menu_customFilter
 from sub_console.menu_login import menu_login
+from controller.meterController import meterController
+
 
 from pathlib import Path
 
-import json
+import json, csv
 
 def parse(arg):
     'Convert a series of zero or more numbers to an argument tuple'
@@ -26,9 +28,10 @@ class main(console):
 	6	Create payment to change meter credit
 
 	==========================================================================
+	l	Login
 	f	Set custom filter
 	g	Get meter based on custom filter (f) for current login session (l)
-	l	Login
+	c	Compare current taken meters by (g) with csv (semicolon delimiters) file 
 	s	Setting
 	x	Exit
 	
@@ -101,6 +104,7 @@ class main(console):
 			#2 get meter info
 			loginSession = sparkWebsite(data['baseurl'], data['username'], data['password'])
 			loginSession.METER.getAllMeterInfo().changeAllMeterCredit(float( tamount), float(tmaxmount))
+
 	def do_4(self, arg):
 		'''
 		
@@ -123,6 +127,13 @@ class main(console):
 		'''
 
 		self.do_help('5')
+
+		url = self.currentWebsiteSession.LOGIN_iNFO.URL
+		if len(url)>0 :
+			url += '/tariff'
+			import webbrowser
+			webbrowser.open(url, new=2)
+			
 		tarifId = self.myInput('input valid tarif id and recheck, `enter` or `x` to abort: ', 'x')
 		if tarifId !='x':
 			self.currentWebsiteSession.METER.changeAllMeterTariff(tarifId)
@@ -158,18 +169,134 @@ class main(console):
 		filtered meters from current login session
 		
 		show	Showing current filtered meters 
+		-d		Get MeterInfo including customer code, meter coordinate
+		-s		Save to Json and CSV
+
 		'''
 		if arg=='show':
 			print(json.dumps(self.meterJsonArray, indent=4))
+			print('Total : %i' % (len( self.meterJsonArray)))
+
+		elif arg == '-s':
+			self.saveJson(self.currentWebsiteSession.LOGIN_iNFO.URL)	
 		else:
 			pFilt = self.currentFilter
-			meters = self.currentWebsiteSession.METER.getMeterInfo(filterJson=pFilt, useFilter=True)
+			if arg == "-d":
+				meters = self.currentWebsiteSession.METER.getMeterInfo(pFilt,True).getDetailOfAllMeterlInfo()
+			
+			else:
+				meters = self.currentWebsiteSession.METER.getMeterInfo(filterJson=pFilt, useFilter=True)
+			
 			self.meterJsonArray = meters.METER_JSONCOLLECTION['meters']
-
-			if input('type `yes` to show: ') =='yes':
+			if input('type `yes` to show ') =='yes':
 				self.do_g('show')
+			self.do_g('-s')
+			
+	def do_c(self, arg):
+		'''
+		
+		Compare meter info on current grabbed meter to specific csv 
+		required column name: `site_url`, `add?` see comprarison.csv for example
 
+		example:
+			c mycomparisondata.csv
 
+		see this before dig me: 'g' or 'g -d' 
+
+		'''
+		if not Path(arg.replace('"','')).exists() or arg =='':
+			return
+		with open(arg.replace('"','')) as csvFile:
+			csvReader = csv.DictReader(csvFile, dialect='excel', delimiter=';')
+			newMeterInfos =[]
+			dik =[]
+			for b in csvReader:
+				d ={}
+				for key, value in b.items():
+					d[key]=value
+				dik.append(d)
+			
+			##### iterate all grabbed meters
+			a=1
+			z=len(self.meterJsonArray)
+			
+			for m in self.meterJsonArray:
+				
+				##### print meter index
+				print('\n\nMeter no %s from %s ; SN = %s ; url = %s' %(a,z, m['meter_serial'], self.currentWebsiteSession.LOGIN_iNFO.URL))
+				a += 1
+
+				##### print header
+				print('%-134s????????????  Type `a new value`/ c / l / ~:null / ENTER:skip  ??????????????' % '')
+				print('%-32s %-50s %s' % ('', '(c) Cloud Version', '(l) Local version'))
+		
+
+				##### finding matches meter serial on csv
+				newMeterInfo = {}
+
+				askforsave = False
+				for cm in dik:
+					##### compare if found
+					if cm.get('meter_serial') == m.get('meter_serial') and cm.get('site_url') in (self.currentWebsiteSession.LOGIN_iNFO.URL) and cm.get('add?', '')=='' :
+						
+						tempNewMetetInfo = {}
+						for key in m:
+							value = m.get(key,'')
+							cmvalue =cm.get(key,value) 
+							if cmvalue != value:
+								askforsave = True
+								inp = input('%-30s : %-50s %-50s <<<<<<<<< ' % (key, value, cmvalue))
+								if inp == 'c' or inp == '':
+									tempNewMetetInfo[key] = value
+								elif inp == 'l':
+									tempNewMetetInfo[key] = cmvalue
+								else:
+									tempNewMetetInfo[key] = inp
+
+						newMeterInfo = tempNewMetetInfo
+						print('\n↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓\n')
+					
+				
+				newMeterInfo = {**m, **newMeterInfo}
+
+				for key in m:
+					print('%-30s : %-50s %s' % (key, m[key], newMeterInfo.get(key,'')))
+
+				newMeterInfos.append(newMeterInfo)
+				
+				if m != newMeterInfo:
+					if input('Type `s` to send or else to skip anymore : ') == 's':
+						self.currentWebsiteSession.METER.editMeterInfo(m['meter_serial'], **newMeterInfo)
+
+			Path('new_meter_info.json').write_text(str(newMeterInfos))
+
+				
+				
+				
+
+				
+
+	def saveJson(self, url):
+		url = str(url)
+		if url =='' or len(url.split('/')) <= 2 or self.meterJsonArray == '':
+			return
+		
+		outputFileName = url.split('/')[2]
+		inp = input("type `sv` to save to %s -- json and csv file: " % (outputFileName)) 
+		if inp =='sv':
+			header = []
+			for key in self.meterJsonArray[0]:
+				header.append(key)
+
+			with open(outputFileName+'.csv', 'w', newline='') as mFile:
+				out = csv.DictWriter(mFile, dialect='excel', fieldnames=header, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+				out.writeheader()
+				out.writerows(self.meterJsonArray)
+						
+
+		
+			rJ( outputFileName +'.json').createFromObject(self.meterJsonArray).save()
+	
 	def do_l(self, arg):
 		'''
 
@@ -180,7 +307,9 @@ class main(console):
 		if type(self.__myLogin) != type(menu_login()):
 			self.__myLogin = menu_login()
 
-		self.__myLogin =  self.openChild(self.__myLogin,arg)
+		args = '%s %s' % (arg , str(self.settingJson).replace("'",'"').replace('True', 'true').replace('False', 'false'))
+		#TODO support select login from current settings
+		self.__myLogin =  self.openChild(self.__myLogin, args)
 
 		if self.__myLogin is not None :
 			self.currentWebsiteSession = self.__myLogin.BROWSER_SESSION
@@ -199,7 +328,7 @@ class main(console):
 
 		a=rJ(name).read()
 		self.settingJson = a['credentials']
-
+	
 	def precmd(self, line):
 		self.do_s()
 		return line
