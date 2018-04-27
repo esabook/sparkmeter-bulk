@@ -18,7 +18,7 @@ class menu_customFilter(console):
 	'> ' : left  >    	  right
 	'>=' : left  >=   	  right
 	'!=' : left  !=   	  right	
-	'===': left	 ==   	  right	
+	'==': left	 ==   	  right	
 	'%-' : left  in   	  right	
 	'-%' : right in   	  left
 	'%!' : left  not in   right	

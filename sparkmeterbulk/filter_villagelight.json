@@ -1,0 +1,4 @@
+{
+    "tariff_name_?==": "VillageLight",
+    "meter_state_?!=": 1
+}
