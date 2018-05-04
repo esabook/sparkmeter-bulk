@@ -142,13 +142,24 @@ class meterController():
 			
 				# 2  set meter credit
                 print('Meter: %-45s from %-30s => add %-20s ' % (serial, credit, abs(amountTarget-credit)),end = "")			
-
-                br = self.changeMeterCredit(serial, abs( amountTarget - credit)) 
+                try:
+                    br = self.changeMeterCredit(serial, abs( amountTarget - credit)) 
+                except Exception as e:
+                    print(e)
                 print('http response: %s' % (br.response.status_code))
 				
             else:
                 print('Meter: %-45s from  %-56s PASS' % (serial, credit))
 
+    def reverse(self, trxIdArray):
+        br = self.BROWSER
+        self.MAIN_uRL = br.url if self.MAIN_uRL is None else self.MAIN_uRL
+        url = self.MAIN_uRL+'transaction/'+trxIdArray+'/reverse'
+        print(url)
+        try:
+            br.open(url)
+        except Exception as e:
+            print(e)
     def changeAllMeterState(self, newMeterState:str):
         '''
         
@@ -214,10 +225,16 @@ class meterController():
 		
         form = br.get_form(id='transaction_form')
         # form['vendor'].value = form['vendor'].options[0].value,				#first customer id, semi-hardcoded
-        form['acct_type'].value = 'credit'
-        form['source'].value = form['source'].options[2]						#
-        form['amount'].value = amount
 
+       				                
+        # for p in form['account'].options:
+        #     if 'kur' in br.find(value=p).string:
+        #         form['account'].value = p
+        
+        form['acct_type'].value = 'credit'
+        form['source'].value = form['source'].options[2]	
+        form['amount'].value = amount
+        
         br.submit_form(form)
         return br
 
@@ -226,7 +243,7 @@ class meterController():
         if  br._cursor == -1 : return br
         
         mainUrl=self.read()['main_url']
-        url = mainUrl + "/meter/" + meter_serial +'/set-state'
+        url = mainUrl + meter_serial +'/set-state'
         #bodyParams = urllib.parse.urlencode({'state': relayState})
 
         response =br.session.post(url,None, json={'state': relayState})
@@ -285,8 +302,9 @@ class meterController():
         br = self.BROWSER
         if  br._cursor == -1 : return br
         
-        mainUrl=self.MAIN_uRL
+        mainUrl=self.MAIN_uRL if self.MAIN_uRL is not None else br.url
         url = mainUrl + "/meter/" + meter_serial +'/reset-meter'
+        print(url)
         br.open(url)
 
         return br

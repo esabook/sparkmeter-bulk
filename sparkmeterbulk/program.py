@@ -135,7 +135,8 @@ class main(console):
 				state = 'off' if intState == 0 else 'on' if intState == 1 else 'auto'
 				self.currentWebsiteSession.METER.changeAllMeterState(m['meter_serial'], state)
 						
-				
+	def do_m(self, arg):
+		self.currentWebsiteSession.METER.changeMeterState(arg, 'off')		
 	
 	def do_5(self, arg):
 		'''
@@ -178,10 +179,10 @@ class main(console):
 		if not tamount.isdigit() or not tmaxmount.isdigit() :
 			print("Input is invalid number")
 			return
-		
+			
 		self.currentWebsiteSession.METER.changeAllMeterCredit(float(tamount), float(tmaxmount))
-	
-
+		
+		
 	def do_7(self, arg):
 		'''
 		Push new meter information on temporary file (end result/output) of `c` command,
@@ -200,6 +201,10 @@ class main(console):
 			a += 1
 			self.editMeter(m, False)
 
+	def do_reverse(self, arg):
+		rr = ['19227266-b852-4213-b7df-76caf7d0c410','e1f31013-b9e0-486a-8f5c-5fcb6f75bd58','573801e3-8978-49f9-ba6f-3f5b333c2958','eea98cfa-dab1-4711-9de2-f9a776e2f88b','ec0f7408-ba89-43cc-9a00-0694371ed6cc','c7e21141-3799-4fc8-bba7-6c7d6a415edf','6022cb6b-da51-44c3-aa87-a1912c5d1d12','aed43da1-f6bb-4c01-8778-dd3a3c496622','497ebe81-040f-43c2-bef2-9b9283b358f4','95feb6aa-879c-42eb-be23-5240acd24e45','9ae5ec1c-14b2-4190-99a9-57f4fb5d13bc','f5bbf7e5-6b27-44de-80b0-0a302faf9c31','233c8e29-ae46-4f1a-a730-2ea41d1e886d','c765c952-a583-48af-8c3f-7664dfc2db16','7d78cdcf-9966-463c-a383-afe1035a7b46','269ef483-6efa-44c8-aa4a-c5c389200140','faa34070-860c-4d00-ae74-7b61121e285f','4a3e7e59-044d-4a9b-8672-332a28b355d3','ec48df12-b2ed-4463-b59b-b46dcde07995','10d50f05-a968-46cb-8add-6f2660601407','3b65ae02-0cc6-4951-9c3f-cb24f13985be','911edde5-b64b-430f-b71c-2fe891a620ef','00629c25-a910-4c11-aea3-e0c208759474','494071e0-3905-40cf-8066-4a6622b8438f','b0fe92da-a48b-40ec-8716-95ec81812adc','b41c6211-6df1-4089-877d-bda9ba6a00bc','0cc9ac86-8874-4f54-a66d-90396d9bfa51']
+		for s in rr:
+			self.currentWebsiteSession.METER.reverse(s)
 
 	def do_8(self, arg):
 		'''
@@ -276,13 +281,15 @@ class main(console):
 					state = 'state'
 					sn = 'serial'
 					addr ='address'
+					iii = 0
 					for meterstate in meterStates:
 						if str(meterstate[state]).lower() == "protect":
+							iii+=1
 							meterstate['access_user'] = admin_name
 							meterstate['reset_datetime'] =  datetime.datetime.utcnow()
 							gb = meterstate[ground_nm]
 
-							print('Reset for SN: %-25s ADDR: %-50s on GB: %-50s ' % (meterstate[sn], meterstate[addr], gb ))
+							print('%s Reset for SN: %-25s ADDR: %-50s on GB: %-50s ' % (iii, meterstate[sn], meterstate[addr], gb ))
 							self.do_resetprotect(meterstate[sn])
 							
 							
@@ -396,11 +403,14 @@ class main(console):
 			self.saveJson(self.currentWebsiteSession.LOGIN_iNFO.URL)	
 		else:
 			pFilt = self.currentFilter
-			if arg == "-d":
-				meters = self.currentWebsiteSession.METER.getMeterInfo(pFilt,True).getDetailOfAllMeterlInfo()
-			
-			else:
-				meters = self.currentWebsiteSession.METER.getMeterInfo(filterJson=pFilt, useFilter=True)
+			try:
+				if arg == "-d":
+					meters = self.currentWebsiteSession.METER.getMeterInfo(pFilt,True).getDetailOfAllMeterlInfo()
+				else:
+					meters = self.currentWebsiteSession.METER.getMeterInfo(filterJson=pFilt, useFilter=True)
+					
+			except Exception as e:
+				print(e)
 			
 			self.meterJsonArray = meters.METER_JSONCOLLECTION['meters']
 			if input('type `yes` to show ') =='yes':
@@ -488,8 +498,8 @@ class main(console):
 					if input('Type `s` to send or else to skip anymore : ').lower() == 's':
 						self.editMeter(newMeterInfo)
 							
-
-			Path('temp_new_meter_info-'+self.currentWebsiteSession.LOGIN_iNFO.URL.split('/')[2]+'.json').write_text(str(json.dumps(newMeterInfos, indent=4)))
+			if len(newMeterInfos)>0:
+				Path('temp_new_meter_info-'+self.currentWebsiteSession.LOGIN_iNFO.URL.split('/')[2]+'.json').write_text(str(json.dumps(newMeterInfos, indent=4)))
 
 	def editMeter(self, meterInfo, verboseMode:bool=True, maxRetry:int=-1):
 		retries = True
