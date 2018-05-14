@@ -15,13 +15,14 @@
 	c	Compare current taken meters by (g) with csv (semicolon delimiters) file 
 	s	Setting
 	x	Exit
-
+```
 =================================================
 =================================================
 =================================================
 ===================GUIDE=========================
 =================================================
 =================================================
+
 create bulk zeroing meter credit 30 april 4pm
 	turn all to off
 	zeroing credit
@@ -64,7 +65,4 @@ see step `1.c` for set as filtering mode -----> see `f command`
 = 3
 8 reset-protect
 select target site
-
-
-
-
+```
