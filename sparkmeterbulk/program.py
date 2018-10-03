@@ -202,6 +202,7 @@ class main(console):
 			self.editMeter(m, False)
 
 	def do_reverse(self, arg):
+		# TODO fixing rr reads from args parse
 		rr = ['19227266-b852-4213-b7df-76caf7d0c410','e1f31013-b9e0-486a-8f5c-5fcb6f75bd58','573801e3-8978-49f9-ba6f-3f5b333c2958','eea98cfa-dab1-4711-9de2-f9a776e2f88b','ec0f7408-ba89-43cc-9a00-0694371ed6cc','c7e21141-3799-4fc8-bba7-6c7d6a415edf','6022cb6b-da51-44c3-aa87-a1912c5d1d12','aed43da1-f6bb-4c01-8778-dd3a3c496622','497ebe81-040f-43c2-bef2-9b9283b358f4','95feb6aa-879c-42eb-be23-5240acd24e45','9ae5ec1c-14b2-4190-99a9-57f4fb5d13bc','f5bbf7e5-6b27-44de-80b0-0a302faf9c31','233c8e29-ae46-4f1a-a730-2ea41d1e886d','c765c952-a583-48af-8c3f-7664dfc2db16','7d78cdcf-9966-463c-a383-afe1035a7b46','269ef483-6efa-44c8-aa4a-c5c389200140','faa34070-860c-4d00-ae74-7b61121e285f','4a3e7e59-044d-4a9b-8672-332a28b355d3','ec48df12-b2ed-4463-b59b-b46dcde07995','10d50f05-a968-46cb-8add-6f2660601407','3b65ae02-0cc6-4951-9c3f-cb24f13985be','911edde5-b64b-430f-b71c-2fe891a620ef','00629c25-a910-4c11-aea3-e0c208759474','494071e0-3905-40cf-8066-4a6622b8438f','b0fe92da-a48b-40ec-8716-95ec81812adc','b41c6211-6df1-4089-877d-bda9ba6a00bc','0cc9ac86-8874-4f54-a66d-90396d9bfa51']
 		for s in rr:
 			self.currentWebsiteSession.METER.reverse(s)
@@ -209,7 +210,7 @@ class main(console):
 	def do_8(self, arg):
 		'''
 		Bulk menu to access bulk script
-		hard typed available argument: `reset-protect`, `zero-credit`,  `set-credit` 
+		hard typed available argument: `reset-protect`, `zero-credit`,  `set-credit`, `archive`
 
 		related command: `1`, `2`, `3`
 
@@ -222,6 +223,8 @@ class main(console):
 			self.do_2('')
 		if str(arg) == 'set-credit':
 			self.do_3('')
+		if (str(arg) == 'archive'):
+			self.do_archiveall('')
 		
 
 	def do_resetprotectall(self, arg):
@@ -331,7 +334,27 @@ class main(console):
 			except Exception as e:
 				print(e)
 					
-			
+	def do_archiveall(self, args):
+
+		'''
+		archive all meter on cuurent setting login credentials
+
+		'''
+		for data in self.settingJson:
+			#0 skip disabled config
+			if data.get('disabled', False):
+				continue
+		
+			#1 flag for current base url from setting
+			print('\n' + data['baseurl']+'\t:')
+		
+			#2 get meter 
+			self.currentWebsiteSession = sparkWebsite(data['baseurl'], data['username'], data['password'])
+			self.do_g('silent')
+			for m in self.meterJsonArray:
+				m['meter_active'] = False
+				print(m['meter_serial'])
+				self.editMeter(m, True, 3)
 
 
 	def do_d(self, arg):
@@ -413,9 +436,10 @@ class main(console):
 				print(e)
 			
 			self.meterJsonArray = meters.METER_JSONCOLLECTION['meters']
-			if input('type `yes` to show ') =='yes':
-				self.do_g('show')
-			self.do_g('-s')
+			if arg != 'silent':
+				if input('type `yes` to show ') =='yes':
+					self.do_g('show')
+				self.do_g('-s')
 			
 	def do_c(self, arg):
 		'''

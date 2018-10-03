@@ -290,11 +290,13 @@ class meterController():
                 if str(key) == 'meter_state':
                     key = 'state'
                     value = str(value)
-                    
+                if str(key) == 'meter_active':
+                    if not value:
+                        form.fields.pop('active')                # form['active'].value = 'y' if value else 'n'
+                    continue
                 form[str(key)].value = value
             except:
                 pass
-        
         returnBrowser.submit_form(form)
         return returnBrowser
     
